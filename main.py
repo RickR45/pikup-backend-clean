@@ -15,7 +15,7 @@ import requests
 
 app = FastAPI()
 
-# CORS
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,12 +24,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ENV
+# Environment Variables
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Setup
+# Google Credentials
 creds = Credentials.from_service_account_info(
     json.loads(os.getenv("GOOGLE_CREDENTIALS")),
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
@@ -40,6 +40,7 @@ worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 GOOGLE_MAPS_API_KEY = "AIzaSyCMeu5AA1lG1Ty3NPrUz9W6G91-T0ruYN8"
 DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
+# Pricing
 pricing_config = {
     "Home to Home": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
     "In-House Move": {"base": 40, "per_mile": 0, "per_ft3": 0.5, "per_item": 2.5},
@@ -54,15 +55,21 @@ async def submit_move(
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
-        # Flexible handling: if data is None, try JSON body
-        if data:
-            data_obj = json.loads(data)
+        # Safe parsing
+        if data is not None:
+            try:
+                data_obj = json.loads(data)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid FormData JSON provided.")
         else:
-            data_obj = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid data format received.")
+            try:
+                data_obj = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid JSON body provided.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Problem reading input: {str(e)}")
 
-    # Extract fields
+    # Extracting fields
     name = data_obj.get("name", "")
     email = data_obj.get("email", "")
     phone = data_obj.get("phone", "")
@@ -75,7 +82,7 @@ async def submit_move(
     use_photos = data_obj.get("use_photos", False)
     items = data_obj.get("items", [])
 
-    # Calculate distance
+    # Distance Calculation
     distance_miles = 0
     if not mileage_override and pickup_address and destination_address:
         r = requests.get(DISTANCE_MATRIX_URL, params={
@@ -96,7 +103,7 @@ async def submit_move(
     if mileage_override is not None:
         distance_miles = mileage_override
 
-    # Calculate price
+    # Price Estimation
     price = 0
     if not use_photos:
         total_ft3 = sum(
@@ -105,7 +112,7 @@ async def submit_move(
         config = pricing_config.get(move_type, pricing_config["Home to Home"])
         price = config["base"] + config["per_mile"] * distance_miles + config["per_ft3"] * total_ft3 + config["per_item"] * len(items)
 
-    # Log to Google Sheets
+    # Save to Google Sheets
     timestamp = datetime.datetime.now().isoformat()
     worksheet.append_row([
         timestamp,
