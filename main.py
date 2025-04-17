@@ -13,7 +13,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 import requests
 
-# Initialize FastAPI app
 app = FastAPI()
 
 # CORS
@@ -25,12 +24,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load environment variables
+# ENVIRONMENT
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Setup Google Sheets
+# Setup
 creds = Credentials.from_service_account_info(
     json.loads(os.getenv("GOOGLE_CREDENTIALS")),
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
@@ -38,11 +37,9 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-# Google Maps Distance
 GOOGLE_MAPS_API_KEY = "AIzaSyCMeu5AA1lG1Ty3NPrUz9W6G91-T0ruYN8"
 DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
-# Pricing
 pricing_config = {
     "Home to Home": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
     "In-House Move": {"base": 40, "per_mile": 0, "per_ft3": 0.5, "per_item": 2.5},
@@ -52,17 +49,15 @@ pricing_config = {
 
 @app.post("/submit")
 async def submit_move(
-    data: Optional[str] = Form(None),
-    files: List[UploadFile] = File(None)
+    data: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
 ):
-    if data is None:
-        raise HTTPException(status_code=400, detail="Missing 'data' in form submission.")
-
     try:
         data_obj = json.loads(data)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
 
+    # Extract fields
     name = data_obj.get("name", "")
     email = data_obj.get("email", "")
     phone = data_obj.get("phone", "")
@@ -78,7 +73,7 @@ async def submit_move(
     # Calculate distance
     distance_miles = 0
     if not mileage_override and pickup_address and destination_address:
-        response = requests.get(DISTANCE_MATRIX_URL, params={
+        r = requests.get(DISTANCE_MATRIX_URL, params={
             "origins": pickup_address,
             "destinations": destination_address,
             "key": GOOGLE_MAPS_API_KEY,
@@ -86,36 +81,27 @@ async def submit_move(
         }).json()
 
         try:
-            rows = response.get("rows", [])
+            rows = r.get("rows", [])
             if rows and rows[0]["elements"] and rows[0]["elements"][0]["status"] == "OK":
                 distance_text = rows[0]["elements"][0]["distance"]["text"]
-                if "mi" in distance_text:
-                    distance_miles = float(distance_text.replace("mi", "").strip())
-                elif "ft" in distance_text:
-                    distance_miles = 0.01
-                else:
-                    distance_miles = 0.01
-        except Exception as e:
-            print("Distance calculation failed:", e)
+                distance_miles = float(distance_text.replace("mi", "").strip()) if "mi" in distance_text else 0.01
+        except Exception:
+            distance_miles = 0.01
 
     if mileage_override is not None:
         distance_miles = mileage_override
 
-    # Estimate price
+    # Calculate price
     price = 0
     if not use_photos:
         total_ft3 = sum(
             (item["length"] * item["width"] * item["height"]) / 1728 for item in items
         )
-        item_count = len(items)
         config = pricing_config.get(move_type, pricing_config["Home to Home"])
-        price = config["base"] + config["per_mile"] * distance_miles + config["per_ft3"] * total_ft3 + config["per_item"] * item_count
+        price = config["base"] + config["per_mile"] * distance_miles + config["per_ft3"] * total_ft3 + config["per_item"] * len(items)
 
-    # Save to Google Sheets
+    # Log to Google Sheets
     timestamp = datetime.datetime.now().isoformat()
-    image_status = "Yes" if use_photos else "No"
-    item_list = ", ".join(item["item_name"] for item in items) if not use_photos else ""
-
     worksheet.append_row([
         timestamp,
         name,
@@ -126,19 +112,19 @@ async def submit_move(
         destination_address,
         distance_miles,
         len(items),
-        item_list,
+        ", ".join(item["item_name"] for item in items) if not use_photos else "",
         round(price, 2),
         "Auto" if use_photos else "Manual",
-        image_status
+        "Yes" if use_photos else "No"
     ])
 
     # Send Email
     msg = MIMEMultipart()
     msg["From"] = EMAIL_ADDRESS
     msg["To"] = EMAIL_ADDRESS
-    msg["Subject"] = f"New PikUp Submission - {name}"
+    msg["Subject"] = f"New PikUp Move Request from {name}"
 
-    body = f"""New Move Request:
+    body = f"""New move request:
 
 Name: {name}
 Email: {email}
@@ -147,16 +133,16 @@ Move Type: {move_type}
 Pickup Address: {pickup_address}
 Dropoff Address: {destination_address}
 Distance: {distance_miles} miles
-Items: {item_list if item_list else 'Photos uploaded'}
+Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 """
     msg.attach(MIMEText(body, "plain"))
 
     if files:
         for file in files:
-            file_content = await file.read()
+            content = await file.read()
             part = MIMEBase("application", "octet-stream")
-            part.set_payload(file_content)
+            part.set_payload(content)
             encoders.encode_base64(part)
             part.add_header("Content-Disposition", f"attachment; filename={file.filename}")
             msg.attach(part)
@@ -167,7 +153,8 @@ Estimated Price: ${round(price, 2) if price else 'Pending'}
     server.send_message(msg)
     server.quit()
 
-    if use_photos:
-        return {"status": "success", "message": "Photos received. We will quote you soon."}
-    else:
-        return {"status": "success", "estimated_price": round(price, 2), "distance_miles": distance_miles}
+    return {
+        "status": "success",
+        "estimated_price": round(price, 2) if price else "pending",
+        "distance_miles": distance_miles
+    }
