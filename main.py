@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import os
@@ -24,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ENVIRONMENT
+# ENV
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
@@ -49,13 +49,18 @@ pricing_config = {
 
 @app.post("/submit")
 async def submit_move(
-    data: str = Form(...),
+    request: Request,
+    data: Optional[str] = Form(None),
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
-        data_obj = json.loads(data)
+        # Flexible handling: if data is None, try JSON body
+        if data:
+            data_obj = json.loads(data)
+        else:
+            data_obj = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+        raise HTTPException(status_code=400, detail="Invalid data format received.")
 
     # Extract fields
     name = data_obj.get("name", "")
