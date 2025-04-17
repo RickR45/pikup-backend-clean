@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import os
@@ -16,7 +16,7 @@ import requests
 # Initialize FastAPI app
 app = FastAPI()
 
-# CORS settings
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,12 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Setup environment variables
+# Load environment variables
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Setup Google Sheets client
+# Setup Google Sheets
 creds = Credentials.from_service_account_info(
     json.loads(os.getenv("GOOGLE_CREDENTIALS")),
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
@@ -38,7 +38,7 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-# Google Maps Distance Matrix
+# Google Maps Distance
 GOOGLE_MAPS_API_KEY = "AIzaSyCMeu5AA1lG1Ty3NPrUz9W6G91-T0ruYN8"
 DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
@@ -56,12 +56,12 @@ async def submit_move(
     files: List[UploadFile] = File(None)
 ):
     if data is None:
-        return {"error": "No data received from frontend."}
+        raise HTTPException(status_code=400, detail="Missing 'data' in form submission.")
 
     try:
         data_obj = json.loads(data)
     except Exception as e:
-        return {"error": "Invalid JSON data", "details": str(e)}
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
     name = data_obj.get("name", "")
     email = data_obj.get("email", "")
