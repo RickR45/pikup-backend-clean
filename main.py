@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Optional
 import os
 import json
 import datetime
@@ -38,11 +38,11 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-# Setup Google Maps Distance Matrix API
+# Google Maps Distance Matrix
 GOOGLE_MAPS_API_KEY = "AIzaSyCMeu5AA1lG1Ty3NPrUz9W6G91-T0ruYN8"
 DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
-# Pricing structure
+# Pricing
 pricing_config = {
     "Home to Home": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
     "In-House Move": {"base": 40, "per_mile": 0, "per_ft3": 0.5, "per_item": 2.5},
@@ -52,13 +52,16 @@ pricing_config = {
 
 @app.post("/submit")
 async def submit_move(
-    data: str = Form(...),
+    data: Optional[str] = Form(None),
     files: List[UploadFile] = File(None)
 ):
+    if data is None:
+        return {"error": "No data received from frontend."}
+
     try:
         data_obj = json.loads(data)
     except Exception as e:
-        return {"error": "Invalid form data", "details": str(e)}
+        return {"error": "Invalid JSON data", "details": str(e)}
 
     name = data_obj.get("name", "")
     email = data_obj.get("email", "")
