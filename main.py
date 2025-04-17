@@ -1,7 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 import os
 import json
 import datetime
@@ -13,7 +12,6 @@ from email import encoders
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-from PIL import Image
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -27,12 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load credentials
-GOOGLE_SHEET_ID = "your_google_sheet_id_here"  # Replace!
-EMAIL_ADDRESS = "your_email@gmail.com"          # Replace!
-EMAIL_PASSWORD = "your_gmail_app_password_here" # Replace!
+# Setup environment variables
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Setup Google Sheets
+# Setup Google Sheets client
 creds = Credentials.from_service_account_info(
     json.loads(os.getenv("GOOGLE_CREDENTIALS")),
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
@@ -40,11 +38,11 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-# Google Distance Matrix
+# Setup Google Maps Distance Matrix API
 GOOGLE_MAPS_API_KEY = "AIzaSyCMeu5AA1lG1Ty3NPrUz9W6G91-T0ruYN8"
 DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 
-# Pricing
+# Pricing structure
 pricing_config = {
     "Home to Home": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
     "In-House Move": {"base": 40, "per_mile": 0, "per_ft3": 0.5, "per_item": 2.5},
@@ -52,27 +50,22 @@ pricing_config = {
     "Junk Removal": {"base": 100, "per_mile": 0, "per_ft3": 0.1, "per_item": 5}
 }
 
-class ItemData(BaseModel):
-    item_name: Optional[str]
-    length: float
-    width: float
-    height: float
-    use_ai: bool
-
-# Accept multipart form: data + files
 @app.post("/submit")
 async def submit_move(
     data: str = Form(...),
     files: List[UploadFile] = File(None)
 ):
-    data_obj = json.loads(data)
+    try:
+        data_obj = json.loads(data)
+    except Exception as e:
+        return {"error": "Invalid form data", "details": str(e)}
 
-    name = data_obj.get("name")
-    email = data_obj.get("email")
-    phone = data_obj.get("phone")
-    move_type = data_obj.get("move_type")
-    pickup_address = data_obj.get("pickup_address")
-    destination_address = data_obj.get("destination_address")
+    name = data_obj.get("name", "")
+    email = data_obj.get("email", "")
+    phone = data_obj.get("phone", "")
+    move_type = data_obj.get("move_type", "")
+    pickup_address = data_obj.get("pickup_address", "")
+    destination_address = data_obj.get("destination_address", "")
     current_lat = data_obj.get("current_lat")
     current_lng = data_obj.get("current_lng")
     mileage_override = data_obj.get("mileage_override")
@@ -100,7 +93,7 @@ async def submit_move(
                 else:
                     distance_miles = 0.01
         except Exception as e:
-            print("Distance calc failed:", e)
+            print("Distance calculation failed:", e)
 
     if mileage_override is not None:
         distance_miles = mileage_override
