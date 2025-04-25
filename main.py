@@ -85,19 +85,25 @@ async def submit_move(
     # Distance Calculation
     distance_miles = 0
     if not mileage_override and pickup_address and destination_address:
+        print(f"Calculating distance between: {pickup_address} and {destination_address}")
         r = requests.get(DISTANCE_MATRIX_URL, params={
             "origins": pickup_address,
             "destinations": destination_address,
             "key": GOOGLE_MAPS_API_KEY,
             "units": "imperial"
         }).json()
+        print(f"Distance Matrix API Response: {r}")
 
         try:
             rows = r.get("rows", [])
             if rows and rows[0]["elements"] and rows[0]["elements"][0]["status"] == "OK":
                 distance_text = rows[0]["elements"][0]["distance"]["text"]
                 distance_miles = float(distance_text.replace("mi", "").strip()) if "mi" in distance_text else 0.01
-        except Exception:
+                print(f"Calculated distance: {distance_miles} miles")
+            else:
+                print(f"Error in API response: {r.get('status', 'Unknown error')}")
+        except Exception as e:
+            print(f"Error calculating distance: {str(e)}")
             distance_miles = 0.01
 
     if mileage_override is not None:
@@ -174,6 +180,10 @@ Estimated Price: ${round(price, 2) if price else 'Pending'}
     user_msg["To"] = email
     user_msg["Subject"] = "Your PikUp Move Request Confirmation"
 
+    # Format the timestamp in American style
+    move_date = datetime.datetime.fromisoformat(timestamp)
+    formatted_date = move_date.strftime("%B %d, %Y at %I:%M %p")
+
     user_body = f"""Thank you for choosing PikUp! Here are the details of your move request:
 
 Move Details:
@@ -184,18 +194,13 @@ Phone: {phone}
 Move Type: {move_type}
 Pickup Address: {pickup_address}
 Dropoff Address: {destination_address}
-Scheduled Date/Time: {timestamp}
+Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
 Number of Items: {len(items)}
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
-Driver Pay: ${round(price * 0.7, 2) if price else 'Pending'}
 
-Next Steps:
-----------
-1. Our team will review your request and confirm the final price
-2. You'll receive a confirmation email with the final price and driver details
-3. Your driver will contact you before the scheduled move time
+We're connecting you with a driver who will contact you before your scheduled move time.
 
 If you have any questions or need to make changes to your request, please contact us at {EMAIL_ADDRESS}
 
