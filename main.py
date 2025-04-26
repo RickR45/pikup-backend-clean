@@ -85,26 +85,26 @@ async def submit_move(
     # Distance Calculation
     distance_miles = 0
     if not mileage_override and pickup_address and destination_address:
-        print(f"Calculating distance between: {pickup_address} and {destination_address}")
-        r = requests.get(DISTANCE_MATRIX_URL, params={
-            "origins": pickup_address,
-            "destinations": destination_address,
-            "key": GOOGLE_MAPS_API_KEY,
-            "units": "imperial"
-        }).json()
-        print(f"Distance Matrix API Response: {r}")
-
         try:
-            rows = r.get("rows", [])
-            if rows and rows[0]["elements"] and rows[0]["elements"][0]["status"] == "OK":
-                distance_text = rows[0]["elements"][0]["distance"]["text"]
-                distance_miles = float(distance_text.replace("mi", "").strip()) if "mi" in distance_text else 0.01
-                print(f"Calculated distance: {distance_miles} miles")
+            response = requests.get(DISTANCE_MATRIX_URL, params={
+                "origins": pickup_address,
+                "destinations": destination_address,
+                "key": GOOGLE_MAPS_API_KEY,
+                "units": "imperial"  # Get distance in miles
+            })
+            if response.status_code == 200:
+                distance_data = response.json()
+                rows = distance_data.get("rows")
+                if rows:
+                    elements = rows[0].get("elements")
+                    if elements and elements[0].get("status") == "OK":
+                        distance_meters = elements[0]["distance"]["value"]
+                        distance_miles = distance_meters / 1609.34  # meters to miles
+                        distance_miles = round(distance_miles, 2)
             else:
-                print(f"Error in API response: {r.get('status', 'Unknown error')}")
+                print(f"Distance API error: {response.status_code}")
         except Exception as e:
-            print(f"Error calculating distance: {str(e)}")
-            distance_miles = 0.01
+            print(f"Distance calculation failed: {str(e)}")
 
     if mileage_override is not None:
         distance_miles = mileage_override
