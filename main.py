@@ -106,7 +106,7 @@ async def submit_move(
         except Exception as e:
             print(f"Distance calculation failed: {str(e)}")
 
-    if mileage_override is not None:
+    if mileage_override not in (None, "", 0):
         distance_miles = mileage_override
 
     # Price Estimation
