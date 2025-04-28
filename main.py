@@ -52,8 +52,8 @@ from google.oauth2.service_account import Credentials
 import os
 
 # Correct way: Load from local file (make sure google-credentials.json exists in your folder)
-creds = Credentials.from_service_account_file(
-    "google-credentials.json",
+creds = Credentials.from_service_account_info(
+    json.loads(os.getenv("GOOGLE_CREDENTIALS")),
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
 )
 
