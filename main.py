@@ -14,6 +14,23 @@ from google.oauth2.service_account import Credentials
 import requests
 
 app = FastAPI()
+import pprint
+
+@app.get("/test-distance")
+async def test_distance():
+    try:
+        response = requests.get(DISTANCE_MATRIX_URL, params={
+            "origins": "521 Red Drew Ave, Tuscaloosa, AL 35401",
+            "destinations": "92 Springbrook Cir, Tuscaloosa, AL 35405",
+            "key": GOOGLE_MAPS_API_KEY,
+            "units": "imperial"
+        })
+        data = response.json()
+        pprint.pprint(data)
+        return data
+    except Exception as e:
+        return {"error": str(e)}
+
 
 # CORS setup
 app.add_middleware(
@@ -31,10 +48,15 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
 # Google Credentials
-creds = Credentials.from_service_account_info(
-    json.loads(os.getenv("GOOGLE_CREDENTIALS")),
+from google.oauth2.service_account import Credentials
+import os
+
+# Correct way: Load from local file (make sure google-credentials.json exists in your folder)
+creds = Credentials.from_service_account_file(
+    "google-credentials.json",
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
 )
+
 gc = gspread.authorize(creds)
 worksheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
@@ -84,13 +106,14 @@ async def submit_move(
 
     # Distance Calculation
     distance_miles = 0
+    distance_miles = 0
     if not mileage_override and pickup_address and destination_address:
         try:
             response = requests.get(DISTANCE_MATRIX_URL, params={
                 "origins": pickup_address,
                 "destinations": destination_address,
                 "key": GOOGLE_MAPS_API_KEY,
-                "units": "imperial"  # Get distance in miles
+                "units": "imperial"
             })
             if response.status_code == 200:
                 distance_data = response.json()
@@ -99,13 +122,18 @@ async def submit_move(
                     elements = rows[0].get("elements")
                     if elements and elements[0].get("status") == "OK":
                         distance_meters = elements[0]["distance"]["value"]
-                        distance_miles = distance_meters / 1609.34  # meters to miles
+                        distance_miles = distance_meters / 1609.34
                         distance_miles = round(distance_miles, 2)
+                    else:
+                        print("No valid elements returned from Distance Matrix API.")
+                else:
+                    print("No valid rows returned from Distance Matrix API.")
             else:
                 print(f"Distance API error: {response.status_code}")
         except Exception as e:
             print(f"Distance calculation failed: {str(e)}")
 
+    # Only override if a real mileage_override was provided
     if mileage_override not in (None, "", 0):
         distance_miles = mileage_override
 
