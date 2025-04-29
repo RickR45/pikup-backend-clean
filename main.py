@@ -149,7 +149,12 @@ async def submit_move(
 
     # Save to Google Sheets
     timestamp = datetime.datetime.now().isoformat()
-    worksheet.append_row([
+    
+    # Get the next empty row
+    next_row = len(worksheet.get_all_values()) + 1
+    
+    # Update the row starting from column A
+    worksheet.update(f'A{next_row}:Q{next_row}', [[
         timestamp,  # Timestamp
         name,  # Name
         email,  # Email
@@ -167,7 +172,7 @@ async def submit_move(
         round(price, 2),  # Price
         round(price * 0.7, 2),  # Driver pay (70% of total price)
         round(price * 0.3, 2)  # Business profit (30% of total price)
-    ])
+    ]])
 
     # Send Email to Admin
     msg = MIMEMultipart()
