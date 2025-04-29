@@ -103,6 +103,7 @@ async def submit_move(
     mileage_override = data_obj.get("mileage_override")
     use_photos = data_obj.get("use_photos", False)
     items = data_obj.get("items", [])
+    additional_info = data_obj.get("additional_info", "")
 
     # Distance Calculation
     distance_miles = 0
@@ -162,6 +163,7 @@ async def submit_move(
         len(items),  # Item Count
         ", ".join(item["item_name"] for item in items) if not use_photos else "",  # Items
         "Yes" if use_photos else "No",  # Image upload
+        additional_info,  # Special Instructions
         round(price, 2),  # Price
         round(price * 0.7, 2),  # Driver pay (70% of total price)
         round(price * 0.3, 2)  # Business profit (30% of total price)
@@ -183,6 +185,7 @@ Pickup Address: {pickup_address}
 Dropoff Address: {destination_address}
 Distance: {distance_miles} miles
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
+Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 """
     msg.attach(MIMEText(body, "plain"))
@@ -226,6 +229,7 @@ Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
 Number of Items: {len(items)}
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
+Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 
 We're connecting you with a driver who will contact you before your scheduled move time.
