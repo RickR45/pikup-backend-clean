@@ -104,6 +104,7 @@ async def submit_move(
     use_photos = data_obj.get("use_photos", False)
     items = data_obj.get("items", [])
     additional_info = data_obj.get("additional_info", "")
+    scheduled_date = data_obj.get("scheduled_date", "")  # Get the scheduled date from user input
 
     # Distance Calculation
     distance_miles = 0
@@ -153,6 +154,13 @@ async def submit_move(
     # Get the next empty row
     next_row = len(worksheet.get_all_values()) + 1
     
+    # Format the scheduled date in American style
+    try:
+        move_date = datetime.datetime.fromisoformat(scheduled_date)
+        formatted_date = move_date.strftime("%B %d, %Y at %I:%M %p")
+    except:
+        formatted_date = scheduled_date  # Use as is if parsing fails
+
     # Update the row starting from column A
     worksheet.update(f'A{next_row}:Q{next_row}', [[
         timestamp,  # Timestamp
@@ -163,7 +171,7 @@ async def submit_move(
         move_type,  # Move Type
         pickup_address,  # Pickup Address
         destination_address,  # Dropoff Address
-        timestamp,  # Date and time of move
+        formatted_date,  # Scheduled date and time of move
         distance_miles,  # Distance
         len(items),  # Item Count
         ", ".join(item["item_name"] for item in items) if not use_photos else "",  # Items
@@ -188,6 +196,7 @@ Phone: {phone}
 Move Type: {move_type}
 Pickup Address: {pickup_address}
 Dropoff Address: {destination_address}
+Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
 Special Instructions: {additional_info if additional_info else 'None provided'}
@@ -215,10 +224,6 @@ Estimated Price: ${round(price, 2) if price else 'Pending'}
     user_msg["From"] = EMAIL_ADDRESS
     user_msg["To"] = email
     user_msg["Subject"] = "Your PikUp Move Request Confirmation"
-
-    # Format the timestamp in American style
-    move_date = datetime.datetime.fromisoformat(timestamp)
-    formatted_date = move_date.strftime("%B %d, %Y at %I:%M %p")
 
     user_body = f"""Thank you for choosing PikUp! Here are the details of your move request:
 
