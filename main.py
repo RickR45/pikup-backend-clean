@@ -104,7 +104,16 @@ async def submit_move(
     use_photos = data_obj.get("use_photos", False)
     items = data_obj.get("items", [])
     additional_info = data_obj.get("additional_info", "")
-    scheduled_date = data_obj.get("scheduled_date", "")  # Get the scheduled date from user input
+    scheduled_date = data_obj.get("scheduled_date", "")  # Format: YYYY-MM-DD
+    scheduled_time = data_obj.get("scheduled_time", "")  # Format: HH:MM
+
+    # Combine date and time as local time
+    try:
+        scheduled_datetime = datetime.datetime.strptime(f"{scheduled_date} {scheduled_time}", "%Y-%m-%d %H:%M")
+        formatted_date = scheduled_datetime.strftime("%B %d, %Y at %I:%M %p")
+    except Exception as e:
+        print(f"Error parsing scheduled date/time: {str(e)}")
+        formatted_date = f"{scheduled_date} {scheduled_time}"  # Fallback to raw strings if parsing fails
 
     # Distance Calculation
     distance_miles = 0
@@ -154,13 +163,6 @@ async def submit_move(
     # Get the next empty row
     next_row = len(worksheet.get_all_values()) + 1
     
-    # Format the scheduled date in American style
-    try:
-        move_date = datetime.datetime.fromisoformat(scheduled_date)
-        formatted_date = move_date.strftime("%B %d, %Y at %I:%M %p")
-    except:
-        formatted_date = scheduled_date  # Use as is if parsing fails
-
     # Update the row starting from column A
     worksheet.update(f'A{next_row}:Q{next_row}', [[
         timestamp,  # Timestamp
