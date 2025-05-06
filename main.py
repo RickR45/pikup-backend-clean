@@ -242,6 +242,8 @@ Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded P
 Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 
+{('We will review your uploaded photos and send you a price quote within the next 24 hours.' if use_photos else '')}
+
 We're connecting you with a driver who will contact you before your scheduled move time.
 
 If you have any questions or need to make changes to your request, please contact us at {EMAIL_ADDRESS}
