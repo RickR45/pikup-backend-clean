@@ -237,7 +237,7 @@ Pickup Address: {pickup_address}
 Dropoff Address: {destination_address}
 Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
-Number of Items: {len(items)}
+Number of Items: {'Pending' if use_photos else len(items)}
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
 Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
