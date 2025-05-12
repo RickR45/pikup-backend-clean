@@ -70,6 +70,8 @@ pricing_config = {
     "Junk Removal": {"base": 100, "per_mile": 0, "per_ft3": 0.1, "per_item": 5}
 }
 
+STAIRS_SURCHARGE = 50  # Flat fee for stairs
+
 @app.post("/submit")
 async def submit_move(
     request: Request,
@@ -102,6 +104,7 @@ async def submit_move(
     current_lng = data_obj.get("current_lng")
     mileage_override = data_obj.get("mileage_override")
     use_photos = data_obj.get("use_photos", False)
+    has_stairs = data_obj.get("has_stairs", False)
     items = data_obj.get("items", [])
     additional_info = data_obj.get("additional_info", "")
     scheduled_date = data_obj.get("scheduled_date", "")  # Format: YYYY-MM-DD
@@ -150,12 +153,16 @@ async def submit_move(
 
     # Price Estimation
     price = 0
+    stairs_charge = 0
     if not use_photos:
         total_ft3 = sum(
             (item["length"] * item["width"] * item["height"]) / 1728 for item in items
         )
         config = pricing_config.get(move_type, pricing_config["Home to Home"])
         price = config["base"] + config["per_mile"] * distance_miles + config["per_ft3"] * total_ft3 + config["per_item"] * len(items)
+        if has_stairs:
+            stairs_charge = STAIRS_SURCHARGE
+            price += stairs_charge
 
     # Save to Google Sheets
     timestamp = datetime.datetime.now().isoformat()
@@ -164,7 +171,7 @@ async def submit_move(
     next_row = len(worksheet.get_all_values()) + 1
     
     # Update the row starting from column A
-    worksheet.update(f'A{next_row}:Q{next_row}', [[
+    worksheet.update(f'A{next_row}:R{next_row}', [[
         timestamp,  # Timestamp
         name,  # Name
         email,  # Email
@@ -178,6 +185,7 @@ async def submit_move(
         len(items),  # Item Count
         ", ".join(item["item_name"] for item in items) if not use_photos else "",  # Items
         "Yes" if use_photos else "No",  # Image upload
+        "Yes" if has_stairs else "No",  # Has Stairs
         additional_info,  # Special Instructions
         round(price, 2),  # Price
         round(price * 0.7, 2),  # Driver pay (70% of total price)
@@ -201,6 +209,8 @@ Dropoff Address: {destination_address}
 Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
+Has Stairs: {'Yes' if has_stairs else 'No'}
+{'Stairs Surcharge: $' + str(stairs_charge) if has_stairs else ''}
 Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 """
@@ -241,6 +251,8 @@ Scheduled Date/Time: {formatted_date}
 Distance: {distance_miles} miles
 Number of Items: {'Pending' if use_photos else len(items)}
 Items: {', '.join(item['item_name'] for item in items) if items else 'Uploaded Photos'}
+Has Stairs: {'Yes' if has_stairs else 'No'}
+{'Stairs Surcharge: $' + str(stairs_charge) if has_stairs else ''}
 Special Instructions: {additional_info if additional_info else 'None provided'}
 Estimated Price: ${round(price, 2) if price else 'Pending'}
 
