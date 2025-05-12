@@ -67,7 +67,8 @@ pricing_config = {
     "Home to Home": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
     "In-House Move": {"base": 40, "per_mile": 0, "per_ft3": 0.5, "per_item": 2.5},
     "Store Pickup": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5},
-    "Junk Removal": {"base": 100, "per_mile": 0, "per_ft3": 0.1, "per_item": 5}
+    "Junk Removal": {"base": 100, "per_mile": 0, "per_ft3": 0.1, "per_item": 5},
+    "Party/Venue": {"base": 100, "per_mile": 3, "per_ft3": 0.5, "per_item": 5}  # Same as Home to Home
 }
 
 STAIRS_SURCHARGE = 50  # Flat fee for stairs
